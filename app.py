@@ -3,11 +3,11 @@ import os
 import pdfplumber
 from pypdf import PdfReader
 import streamlit as st
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
+from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
 from langchain_groq import ChatGroq
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -76,7 +76,6 @@ Key Explanations & Commentary:
 
 def extract_text(file_bytes):
   text_data = ""
-  # Try pdfplumber first
   try:
     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
       for page in pdf.pages:
@@ -86,7 +85,6 @@ def extract_text(file_bytes):
   except Exception:
     pass
 
-  # If pdfplumber didn't yield text, try pypdf
   if not text_data.strip():
     try:
       reader = PdfReader(io.BytesIO(file_bytes))
@@ -105,7 +103,6 @@ uploaded_file = st.file_uploader(
     "Upload Surah PDF (e.g., surah.pdf or Surah-Fatiha.pdf):", type=["pdf"]
 )
 
-# Combine extracted document with contextual text
 with st.spinner("Indexing Surah content..."):
   combined_content = SURAH_FATIHA_TEXT
 
@@ -113,7 +110,9 @@ with st.spinner("Indexing Surah content..."):
     file_bytes = uploaded_file.read()
     extracted = extract_text(file_bytes)
     if extracted:
-      combined_content = f"{extracted}\n\n---\nAdditional Context:\n{SURAH_FATIHA_TEXT}"
+      combined_content = (
+          f"{extracted}\n\n---\nAdditional Context:\n{SURAH_FATIHA_TEXT}"
+      )
 
   text_splitter = RecursiveCharacterTextSplitter(
       chunk_size=400, chunk_overlap=60
@@ -127,25 +126,38 @@ with st.spinner("Indexing Surah content..."):
 
 st.success("Surah loaded and ready for questions!")
 
-# 4. LLM Setup (Using your active Groq model)
+# 4. LLM Setup (Groq)
 llm = ChatGroq(
     groq_api_key=api_key, model_name="qwen/qwen3.8-27b", temperature=0.1
 )
 
-system_prompt = (
-    "You are an academic and helpful Quranic Assistant.\n"
-    "Answer the user's question clearly, thoroughly, and respectfully using the provided context below.\n"
-    "If the question cannot be answered from the context, state that the information is not present in the text.\n\n"
-    "Context:\n{context}"
+template = """You are an academic and helpful Quranic Assistant.
+Answer the user's question clearly, thoroughly, and respectfully using the provided context below.
+If the question cannot be answered from the context, state that the information is not present in the text.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer:"""
+
+prompt = ChatPromptTemplate.from_template(template)
+
+
+def format_docs(docs):
+  return "\n\n".join(doc.page_content for doc in docs)
+
+
+# Modern LCEL RAG Chain (No deprecated langchain.chains needed!)
+rag_chain_from_docs = (
+    RunnablePassthrough.assign(
+        context=(lambda x: format_docs(x["context_docs"]))
+    )
+    | prompt
+    | llm
+    | StrOutputParser()
 )
-
-prompt = ChatPromptTemplate.from_messages([
-    ("system", system_prompt),
-    ("human", "{input}"),
-])
-
-qa_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(retriever, qa_chain)
 
 # 5. Query Box
 user_question = st.text_input(
@@ -155,12 +167,18 @@ user_question = st.text_input(
 
 if user_question:
   with st.spinner("Retrieving verses and generating answer..."):
-    response = rag_chain.invoke({"input": user_question})
+    # Retrieve relevant documents
+    retrieved_docs = retriever.invoke(user_question)
+
+    # Generate answer using LCEL chain
+    answer = rag_chain_from_docs.invoke(
+        {"context_docs": retrieved_docs, "question": user_question}
+    )
 
     st.markdown("### Answer:")
-    st.write(response["answer"])
+    st.write(answer)
 
     with st.expander("View Retrieved Context Chunks"):
-      for idx, doc in enumerate(response["context"]):
+      for idx, doc in enumerate(retrieved_docs):
         st.markdown(f"**Chunk {idx+1}:**")
         st.write(doc.page_content)
