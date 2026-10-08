@@ -1,10 +1,13 @@
 streamlit
 langchain
+langchain-core
 langchain-community
 langchain-text-splitters
 langchain-groq
 langchain-huggingface
 sentence-transformers
 faiss-cpu
-pypdf
 pdfplumber
+pypdfium2
+pytesseract
+Pillow
