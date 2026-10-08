@@ -20,7 +20,7 @@ except ImportError:
 APP_DIR = Path(__file__).parent
 DEFAULT_PDF = APP_DIR / "Surah-Fatiha.pdf"
 CACHE_DIR = APP_DIR / "ocr_cache"
-MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "qwen/qwen3-32b"]
+MODELS = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
 EXAMPLES = [
     "What does the word Rabb mean?",
     "What is said about reciting Surat Al-Fatihah in prayer?",
