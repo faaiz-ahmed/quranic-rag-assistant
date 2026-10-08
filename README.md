@@ -5,7 +5,10 @@ Retrieval-Augmented Generation (RAG) over an English-translation PDF.
 
 🔗 **Live demo:** https://quranic-rag-assistant-toapnfqdhserptsvnrnvrx.streamlit.app/
 
-![Home](docs/screenshots/01-home.png)
+![1](docs/Screenshots/1.PNG)
+
+
+![2](docs/Screenshots/2.PNG)
 
 ## How it works
 PDF → text extraction (OCR for scanned pages) → chunking → embeddings →
