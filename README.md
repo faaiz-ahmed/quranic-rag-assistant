@@ -65,8 +65,5 @@ Settings → Secrets.
 - Answers are only as good as the PDF text and OCR quality.
 - The app is a study aid, not a source of religious rulings.
 
-## Source of the PDF
-<Write the PDF's title and publisher here.>
-
 ## Author
 Faaiz · B.S. Artificial Intelligence, DUET Karachi
